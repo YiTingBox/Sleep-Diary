@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sleep Diary 睡眠日誌</title>
+    <style>
+        /* 核心樣式修正：強制關閉水平捲軸，並確保內容水平置中 */
+        body {
+            background-color: #030910; 
+            color: #b3fff2; 
+            font-family: 'Courier New', Courier, monospace;
+            margin: 0;
+            padding: 20px 0; /* 移除左右邊距，讓內容更靠邊，避免溢出 */
+            display: flex;
+            flex-direction: column;
+            align-items: center; /* 確保所有主要容器水平置中 */
+            min-height: 100vh;
+            overflow-x: hidden; /* 關鍵修正：強制隱藏水平捲軸，避免跑版 */
+        }
+        
+        /* 容器基礎樣式 - 頂部輸入區的外層包裹器 */
+        .container-wrapper {
+            width: 95%; /* 使用百分比，讓它在小螢幕時能自動縮小 */
+            max-width: 850px; /* 設定統一最大寬度 */
+            position: relative;
+            box-sizing: border-box; /* 確保 padding/border 不會增加總寬度 */
+            padding: 0 10px; /* 增加一個小小的左右內邊距作為緩衝 */
+        }
+        
+        /* 掃描線/雜訊濾鏡效果 (::before) */
+        .container-wrapper::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image: linear-gradient(rgba(0, 255, 255, 0.1) 1px, transparent 1px),
+                                     linear-gradient(90deg, rgba(255, 0, 255, 0.05) 1px, transparent 1px);
+            background-size: 100% 4px, 4px 100%;
+            pointer-events: none;
+            z-index: 5;
+            opacity: 0.5;
+        }
+
+        /* 頂部輸入區塊的實際邊框和背景容器 */
+        .container {
+            width: 100%;
+            padding: 30px;
+            margin-top: 30px;
+            margin-bottom: 30px;
+            position: relative;
+            z-index: 1;
+            
+            /* 四層 box-shadow 營造極致光暈 */
+            border: 3px solid #00ffff; 
+            box-shadow: 0 0 5px #00ffff, 
+                                0 0 20px #ff00ff, 
+                                0 0 40px #00ffff,
+                                0 0 60px rgba(255, 0, 255, 0.5); 
+            
+            background-color: rgba(10, 20, 30, 0.95); 
+            
+            display: flex;
+            flex-wrap: wrap; 
+            box-sizing: border-box; /* 確保 padding/border 不會增加總寬度 */
+        }
+
+        /* 標題區塊 - Neon 樣式 */
+        h1 {
+            width: 100%;
+            text-align: left;
+            font-size: 38px;
+            color: #00ffff;
+            text-shadow: 0 0 5px #00ffff, 
+                                 0 0 15px #00ffff, 
+                                 2px 2px 0 #ff00ff;
+            border-bottom: 3px solid #ff00ff; 
+            padding-bottom: 10px;
+            margin-bottom: 10px; 
+            font-weight: bold;
+        }
+
+        /* 左側：輸入表單區 */
+        #dreamLogForm {
+            flex: 0 0 60%; 
+            padding-right: 20px; 
+            box-sizing: border-box;
+            position: relative;
+            display: flex;
+            flex-wrap: wrap; 
+            align-content: flex-start; 
+        }
+        
+        /* 表單和右側之間的分隔線 */
+        #dreamLogForm::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 3px; 
+            height: 100%;
+            background: linear-gradient(to bottom, #ff00ff, #00ffff, #ff00ff);
+            box-shadow: 0 0 8px #ff00ff, 0 0 8px #00ffff;
+        }
+
+        /* 右側：資訊顯示區 */
+        .right-panel {
+            flex: 1; 
+            padding-left: 20px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        /* 次級標題樣式 - Magenta Neon */
+        h2 {
+            font-size: 18px;
+            color: #ff00ff;
+            text-shadow: 0 0 5px #ff00ff;
+            margin-top: 0;
+            width: 100%;
+            padding-bottom: 5px;
+            margin-bottom: 15px;
+            border-bottom: 1px solid rgba(255, 0, 255, 0.5); 
+        }
+
+        /* 輸入欄位組 */
+        .input-group {
+            width: 100%; 
+            margin-bottom: 15px;
+            position: relative;
+        }
+
+        /* Checkbox 樣式 (輸入區) */
+        .checkbox-group {
+            display: block; 
+            margin-top: 10px;
+            text-align: left; 
+        }
+
+        .checkbox-group label {
+            display: inline-block;
+            margin-right: 15px; 
+            margin-bottom: 5px;
+            font-size: 14px;
+            color: #00ffff;
+            cursor: pointer;
+            white-space: nowrap; 
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: auto;
+            margin-right: 5px;
+            box-shadow: none;
+            border: 1px solid #ff00ff;
+            background-color: #04080f; 
+            vertical-align: middle;
+        }
+
+        .checkbox-group input[type="checkbox"]:checked {
+            background-color: #00ffff;
+        }
+        
+        /* 輸入欄位樣式 */
+        input:not([type="range"]):not([type="checkbox"]), select, textarea {
+            background-color: #04080f; 
+            color: #b3fff2; 
+            border: 1px solid #ff00ff; 
+            padding: 8px;
+            font-size: 14px;
+            width: 100%; 
+            box-sizing: border-box;
+            box-shadow: 0 0 5px rgba(255, 0, 255, 0.5); 
+            appearance: none;
+        }
+        
+        /* 按鈕樣式 */
+        #saveBtn {
+            width: 100%;
+            margin-top: 25px;
+            background-color: #00ffff;
+            color: #0d1a26;
+            border: none;
+            padding: 12px 15px;
+            font-size: 18px;
+            cursor: pointer;
+            text-transform: uppercase;
+            box-shadow: 0 0 15px #00ffff;
+            transition: all 0.3s ease-in-out;
+            font-weight: bold;
+            position: relative;
+            overflow: hidden;
+        }
+        #saveBtn:hover {
+            background-color: #ff00ff;
+            color: #fff;
+            box-shadow: 0 0 10px #ff00ff, 0 0 40px #ff00ff, 0 0 80px #ff00ff;
+        }
+        
+        /* 歷史紀錄區塊 - 確保與頂部區塊對齊 */
+        #history {
+            width: 95%; 
+            max-width: 850px; 
+            color: #b3fff2;
+            margin: 20px 0; 
+            padding: 20px;
+            border: 3px solid #ff00ff; 
+            box-shadow: 0 0 5px #ff00ff, 0 0 20px #00ffff;
+            background-color: rgba(10, 20, 30, 0.95);
+            box-sizing: border-box;
+        }
+
+        /* 圖片容器 */
+        #dreamPet {
+            width: 100%; 
+            height: 250px; 
+            margin-bottom: 20px;
+            border: 2px solid #00ffff; 
+            box-shadow: 0 0 10px #00ffff, 0 0 10px #ff00ff inset; 
+            background-color: rgba(0, 0, 0, 0.7); 
+            position: relative; 
+            overflow: hidden; 
+            color: #ff00ff;
+            text-align: center;
+        }
+        
+        #dreamPet img {
+            width: 100%; 
+            height: 100%; 
+            object-fit: cover; 
+            image-rendering: pixelated; 
+            display: block; 
+        }
+
+        /* 數據總覽區塊的樣式 */
+        #data-summary {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 20px;
+            border: 1px dashed #00ffff;
+            background-color: rgba(0, 255, 255, 0.05);
+            font-size: 14px;
+            line-height: 1.6;
+            display: flex;
+            justify-content: space-around;
+            box-sizing: border-box;
+        }
+        
+        .summary-item {
+            padding: 5px;
+            border-left: 3px solid #ff00ff;
+            flex-basis: 48%;
+        }
+        
+        .summary-value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #00ffff;
+            text-shadow: 0 0 5px #00ffff;
+        }
+
+        /* 歷史紀錄條目樣式 */
+        .log-entry {
+            border-bottom: 1px dashed rgba(0, 255, 255, 0.5); 
+            padding: 10px 0; 
+            font-size: 13px; 
+            opacity: 0.9; 
+            white-space: pre-wrap; 
+            position: relative;
+            padding-right: 120px; 
+            min-height: 50px; 
+        }
+        
+        .action-buttons {
+            position: absolute; 
+            top: 5px; 
+            right: 0;
+            display: flex; 
+            gap: 5px; 
+        }
+        
+        .action-buttons button {
+            background: none; 
+            border: 1px solid #ff00ff; 
+            color: #ff00ff; 
+            cursor: pointer; 
+            padding: 4px 6px; 
+            font-size: 10px; 
+            box-shadow: 0 0 3px #ff00ff;
+            white-space: nowrap; 
+        }
+        
+        .action-buttons button.save-button {
+            border-color: #00ffff;
+            color: #00ffff;
+            box-shadow: 0 0 3px #00ffff;
+        }
+
+        /* 編輯模式排版優化 */
+        .edit-mode {
+            padding-right: 120px; 
+        }
+        
+        .edit-mode .log-field {
+            margin-bottom: 8px;
+            font-size: 13px;
+            display: flex;	
+            align-items: center;	
+        }
+        
+        .edit-mode .log-field label {
+            display: inline-block;
+            width: 80px;	
+            color: #00ffff;
+            flex-shrink: 0; 
+        }
+
+        .edit-mode input[type="range"] + output {
+            font-weight: bold; 
+            color: #00ffff; 
+            vertical-align: middle;
+            width: 30px;
+        }
+
+        .edit-mode select,
+        .edit-mode textarea { 
+            flex-grow: 1; 
+            padding: 4px;
+            font-size: 12px;
+            vertical-align: middle;
+            width: auto; 
+        }
+
+        .edit-mode textarea {
+            display: block;
+            height: 100px; 
+            margin-top: 5px;
+        }
+
+        /* 編輯模式中的 Checkbox 容器 (情緒標籤) */
+        .edit-mode .checkbox-group {
+            display: flex; /* 改用 flex 讓標籤能水平分佈，且與 label 對齊 */
+            flex-wrap: wrap;
+            width: calc(100% - 80px); 
+            padding-top: 4px; /* 與 label 的 baseline 對齊 */
+        }
+
+        .edit-mode .checkbox-group label {
+            width: auto;
+            margin-right: 15px; /* 增加間距 */
+            margin-bottom: 5px;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+        }
+        
+        /* 針對夢境簡述 (第 6 個 log-field) 和情緒標籤 (第 7 個 log-field) 進行微調 */
+        .edit-mode .log-field:nth-child(6) { 
+            display: flex; 
+            align-items: flex-start; 
+        }
+        .edit-mode .log-field:nth-child(7) { 
+            display: flex; /* 確保情緒標籤的標題和群組並排 */
+            align-items: flex-start;
+        }
+        
+        .edit-mode .log-field:nth-child(6) label,
+        .edit-mode .log-field:nth-child(7) label {
+            width: 80px; 
+            display: inline-block;
+            padding-top: 4px; /* 讓標籤與輸入內容的頂部對齊 */
+        }
+        /* --- 編輯模式排版優化結束 --- */
+
+
+        /* 響應式設計修正 */
+        @media (max-width: 768px) {
+            #dreamLogForm, .right-panel {
+                flex: 0 0 100%;
+                padding: 0;
+            }
+            #dreamLogForm::after {
+                display: none; 
+            }
+            .right-panel {
+                padding-left: 0;
+                margin-top: 20px;
+            }
+            #data-summary {
+                flex-direction: column; 
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container-wrapper">
+        <div class="container" data-version="CHRONO">
+            <h1>Sleep Diary 睡眠日誌</h1>
+            
+            <p id="motive-text">
+                充足的睡眠能恢復身心、提升專注與情緒；而記錄夢境能幫助你理解自己、整理潛意識並改善睡眠習慣。
+            </p>
+
+            <form id="dreamLogForm">
+                <h2>[DATA LOG] 睡眠紀錄</h2>
+                
+                <div class="input-group">
+                    <label for="sleepTime">入睡時間 >></label>
+                    <select id="sleepTime" required>
+                        <option value="">-- 請選擇時間 --</option>
+                        <script>
+                            for(let h=0; h<24; h++) {
+                                for(let m=0; m<60; m+=30) {
+                                    const time = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+                                    document.write(`<option value="${time}">${time}</option>`);
+                                }
+                            }
+                        </script>
+                    </select>
+                </div>
+
+                <div class="input-group">
+                    <label for="wakeTime">起床時間 >></label>
+                    <select id="wakeTime" required>
+                        <option value="">-- 請選擇時間 --</option>
+                           <script>
+                               for(let h=0; h<24; h++) {
+                                   for(let m=0; m<60; m+=30) {
+                                       const time = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+                                       document.write(`<option value="${time}">${time}</option>`);
+                                   }
+                               }
+                           </script>
+                    </select>
+                </div>
+                
+                <hr style="border-top: 1px solid #ff00ff; margin: 15px 0; box-shadow: 0 0 5px #ff00ff;"> 
+                
+                <div class="input-group">
+                    <label for="latency">入睡潛伏期 >></label>
+                    <select id="latency" required>
+                        <option value="<15">少於 15 分鐘 (極佳)</option>
+                        <option value="15-30">15 - 30 分鐘 (正常)</option>
+                        <option value=">30">超過 30 分鐘 (緩慢)</option>
+                    </select>
+                </div>
+                
+                <div class="input-group">
+                    <label for="vigorScore">醒來後精神狀態 >></label>
+                    <select id="vigorScore" required>
+                        <option value="1">極度疲憊 / 昏沉</option>
+                        <option value="2">略感疲憊 / 普通</option>
+                        <option value="3">精力充沛 / 清醒</option>
+                    </select>
+                </div>
+
+                <div class="input-group">
+                    <label for="dreamContent">夢境內容簡述 >></label>
+                    <textarea id="dreamContent" placeholder="夢境記錄區..."></textarea>
+                </div>
+
+                <div class="input-group">
+                    <label>夢境情緒標籤 (多選) >></label>
+                    <div class="checkbox-group">
+                        <label><input type="checkbox" name="dreamEmotion" value="Joy"> 歡樂/興奮</label>
+                        <label><input type="checkbox" name="dreamEmotion" value="Anxiety"> 焦慮/恐懼</label>
+                        <label><input type="checkbox" name="dreamEmotion" value="Calm"> 平靜/療癒</label>
+                         <label><input type="checkbox" name="dreamEmotion" value="Absurd"> 困惑/荒謬</label>
+                    </div>
+                </div>
+                
+                <div class="input-group">
+                    <label for="qualityScore">整體品質評分 (1-10) >></label>
+                    <input type="range" id="qualityScore" min="1" max="10" value="5" oninput="this.nextElementSibling.value = this.value">
+                    <output style="text-align: center; margin-top: 5px;">5</output>
+                </div>
+
+                <button type="submit" id="saveBtn">紀錄睡眠</button>
+            </form>
+
+            <div class="right-panel">
+                <div id="dreamPet">
+                    <img id="petImage" src="images/sleeping_cockatiel_cyberpunk_pixel_v3.png" alt="Dream Pet - Cyberpunk Cockatiel">
+                </div>
+
+                <div id="dreamOracle">
+                    <h2>[INFO]</h2> 
+                    <p id="oracleContent" style="font-size: 14px; text-align: left;">載入中...</p>
+                </div>
+            </div>
+            
+            <div id="message" style="width:100%"></div>
+        </div>
+    </div>
+    
+    <div id="history">
+        <h2>[LOG] 歷史紀錄</h2>
+        <div id="data-summary">
+            <div class="summary-item">
+                近七日平均時長:<br>
+                <span id="avgDuration" class="summary-value">-- h -- m</span>
+            </div>
+            <div class="summary-item">
+                近七日平均品質:<br>
+                <span id="avgQuality" class="summary-value">-- / 10</span>
+            </div>
+        </div>
+        <div id="logList">沒有歷史數據。</div>
+    </div>
+
+    <script>
+        const form = document.getElementById('dreamLogForm');
+        const message = document.getElementById('message');
+        const logList = document.getElementById('logList');
+        const oracleContent = document.getElementById('oracleContent');
+        const avgDurationDisplay = document.getElementById('avgDuration');
+        const avgQualityDisplay = document.getElementById('avgQuality');
+        const STORAGE_KEY = 'dreamLogs'; 
+        
+        const dreamFacts = [
+            "許多台灣學生平均睡眠時間不足 7 小時，低於青少年建議 8–10 小時。",
+            "晚間補習、作業及讀書讓學生容易晚睡，形成長期睡眠債。",
+            "手機、平板及電腦的藍光會抑制褪黑激素，延遲入睡。",
+            "台灣夏季悶熱或宿舍環境吵雜會降低深度睡眠比例。",
+            "課業壓力和考試焦慮常讓學生睡前無法放鬆。",
+            "熬夜雖可完成短期任務，但長期會影響記憶整合和學習效率。",
+            "睡眠不足會降低注意力與情緒穩定性，影響課堂表現與人際互動。",
+            "使用電子產品追劇或滑社群是學生放鬆方式，但可能增加夢境混亂。",
+            "夜間光線過亮或環境噪音會干擾生理時鐘，影響入睡與深睡品質。",
+            "學生常忽略小睡和休息的重要性，但適度午睡可改善白天精神狀態。",
+            "每天固定睡眠時間，有助穩定生理時鐘。",
+            "睡前 1 小時放下手機、平板，可用閱讀或輕音樂放鬆大腦。",
+            "使用暖色燈光或夜間模式，降低藍光對入睡的影響。",
+            "午睡控制在 20 分鐘以內，補充精力但不影響夜間睡眠。",
+            "睡前做深呼吸、伸展或短時間冥想，幫助放鬆身心。",
+            "白天規律運動，如健走、慢跑、騎單車，可提升夜間深度睡眠。",
+            "睡前列「明日待辦清單」，減少焦慮與思緒紛亂。",
+            "維持舒適的睡眠環境：寢室溫度 18–22 度、光線柔和、噪音低。",
+            "避免睡前大量飲水，減少夜間起床頻率。",
+            "將床僅用於睡眠，避免在床上做作業或滑手機，形成「睡眠提示」。",
+            "REM 睡眠階段能幫助整理情緒與壓力，促進心理健康。",
+            "睡眠不足會增加焦慮與煩躁感，適度休息能改善情緒穩定。",
+            "睡前寫日記或心情記錄，可釋放壓力，幫助入睡。",
+            "適度放鬆活動，如聽音樂或泡溫水澡，有助身心進入睡眠狀態。",
+            "小改變累積效果最佳，例如提前 15 分鐘上床或調整光線。",
+            "與同學分享睡眠心得，互相鼓勵，形成支持系統。",
+            "偶爾晚睡不用自責，保持平常心，次日適度補充休息即可。",
+            "若經常半夜醒來或做惡夢，可尋求校園諮商或專業協助。",
+            "對自己溫柔，理解睡眠不足是生活挑戰，而非個人懈怠。",
+            "睡眠是照顧身心的重要方式，良好睡眠有助學習、記憶與情緒管理。"
+        ];
+
+        document.addEventListener('DOMContentLoaded', function() {
+            loadLogs();
+            displayRandomFact(); 
+            calculateAverages();
+        });
+
+        function displayRandomFact() {
+            const randomIndex = Math.floor(Math.random() * dreamFacts.length);
+            oracleContent.textContent = dreamFacts[randomIndex];
+            oracleContent.style.textAlign = 'left'; 
+        }
+
+        function calculateDuration(sleepTime, wakeTime) {
+            if (!sleepTime || !wakeTime) return { durationMinutes: 0, durationString: 'N/A' };
+            const [sleepHour, sleepMin] = sleepTime.split(':').map(Number);
+            const [wakeHour, wakeMin] = wakeTime.split(':').map(Number);
+            let sleepTotalMinutes = sleepHour * 60 + sleepMin;
+            let wakeTotalMinutes = wakeHour * 60 + wakeMin;
+            let durationMinutes = (wakeTotalMinutes <= sleepTotalMinutes) ? 
+                wakeTotalMinutes + 1440 - sleepTotalMinutes : wakeTotalMinutes - sleepTotalMinutes;
+
+            if (durationMinutes > 16 * 60 || durationMinutes < 0) {
+                 return { durationMinutes: 0, durationString: 'Duration Error' };
+            }
+
+            const hours = Math.floor(durationMinutes / 60);
+            const minutes = durationMinutes % 60;
+            return { durationMinutes, durationString: `${hours}h ${minutes}m` };
+        }
+        
+        function calculateAverages() {
+             let logs = localStorage.getItem(STORAGE_KEY);
+            logs = logs ? JSON.parse(logs) : [];
+            const recentLogs = logs.slice(0, 7);
+            
+            if (recentLogs.length === 0) {
+                avgDurationDisplay.textContent = '-- h -- m';
+                avgQualityDisplay.textContent = '-- / 10';
+                return;
+            }
+
+            let totalDurationMinutes = 0;
+            let totalQualityScore = 0;
+            let validCount = 0;
+            
+            recentLogs.forEach(log => {
+                const durationResult = calculateDuration(log.sleepTime, log.wakeTime);
+                if (durationResult.durationMinutes > 0) {
+                    totalDurationMinutes += durationResult.durationMinutes;
+                    totalQualityScore += log.qualityScore;
+                    validCount++;
+                }
+            });
+            
+            if (validCount === 0) {
+                avgDurationDisplay.textContent = '數據不足';
+                avgQualityDisplay.textContent = 'N/A';
+                return;
+            }
+
+            const avgMinutes = Math.round(totalDurationMinutes / validCount);
+            const avgHours = Math.floor(avgMinutes / 60);
+            const remainingMinutes = avgMinutes % 60;
+            const avgQuality = (totalQualityScore / validCount).toFixed(1);
+
+            avgDurationDisplay.textContent = `${avgHours}h ${remainingMinutes}m`;
+            avgQualityDisplay.textContent = `${avgQuality} / 10`;
+        }
+
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const selectedEmotions = Array.from(document.querySelectorAll('input[name="dreamEmotion"]:checked'))
+                .map(cb => cb.value);
+
+            const newLog = {
+                id: Date.now(), 
+                date: new Date().toLocaleDateString('zh-TW'),
+                sleepTime: document.getElementById('sleepTime').value,
+                wakeTime: document.getElementById('wakeTime').value,
+                latency: document.getElementById('latency').value, 
+                vigorScore: document.getElementById('vigorScore').value, 
+                dreamContent: document.getElementById('dreamContent').value || '未記錄夢境細節', 
+                qualityScore: parseInt(document.getElementById('qualityScore').value),
+                emotions: selectedEmotions 
+            };
+
+            saveLog(newLog); 
+            form.reset(); 
+            document.getElementById('qualityScore').value = 5; 
+            document.getElementById('qualityScore').nextElementSibling.value = 5; 
+            loadLogs(); 
+            calculateAverages();
+            showMessage('數據紀錄成功！'); 
+        });
+
+        function saveLog(newEntry) {
+            let logs = localStorage.getItem(STORAGE_KEY);
+            logs = logs ? JSON.parse(logs) : [];
+            logs.unshift(newEntry); 
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(logs));
+        }
+        
+        window.deleteLog = function(id) { 
+            if (!confirm(`[ALERT] 確認刪除 ID: ${id} 此紀錄嗎？`)) return;
+            let logs = JSON.parse(localStorage.getItem(STORAGE_KEY));
+            logs = logs.filter(log => log.id !== id);
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(logs));
+            loadLogs();
+            calculateAverages();
+            showMessage('數據已清除。');
+        }
+
+        // 編輯功能實作
+        window.editLog = function(id) {
+            let logs = JSON.parse(localStorage.getItem(STORAGE_KEY));
+            const log = logs.find(l => l.id === id);
+            if (!log) return;
+
+            const entryElement = document.getElementById(`log-${id}`);
+            
+            const generateTimeOptions = (selectedValue) => {
+                let options = '';
+                for(let h=0; h<24; h++) {
+                    for(let m=0; m<60; m+=30) {
+                        const time = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+                        const selected = time === selectedValue ? 'selected' : '';
+                        options += `<option value="${time}" ${selected}>${time}</option>`;
+                    }
+                }
+                return options;
+            };
+
+            const generateLatencyOptions = (selectedValue) => {
+                const options = [
+                    { value: '<15', text: '少於 15 分鐘 (極佳)' },
+                    { value: '15-30', text: '15 - 30 分鐘 (正常)' },
+                    { value: '>30', text: '超過 30 分鐘 (緩慢)' }
+                ];
+                return options.map(opt => 
+                    `<option value="${opt.value}" ${opt.value === selectedValue ? 'selected' : ''}>${opt.text}</option>`
+                ).join('');
+            };
+            
+            const generateVigorOptions = (selectedValue) => {
+                const options = [
+                    { value: 1, text: '極度疲憊 / 昏沉' },
+                    { value: 2, text: '略感疲憊 / 普通' },
+                    { value: 3, text: '精力充沛 / 清醒' }
+                ];
+                return options.map(opt => 
+                    `<option value="${opt.value}" ${opt.value == selectedValue ? 'selected' : ''}>${opt.text}</option>`
+                ).join('');
+            };
+
+            const generateEmotionCheckboxes = (id, selectedEmotions) => {
+                // 修正點：使用中文標籤
+                const emotionMap = {
+                    'Joy': '歡樂/興奮',
+                    'Anxiety': '焦慮/恐懼',
+                    'Calm': '平靜/療癒',
+                    'Absurd': '困惑/荒謬'
+                };
+                const emotions = Object.keys(emotionMap);
+                
+                return `<div class="checkbox-group" id="edit-emotion-group-${id}">` +
+                    emotions.map(englishValue => {
+                        const checked = (selectedEmotions && selectedEmotions.includes(englishValue)) ? 'checked' : '';
+                        const chineseText = emotionMap[englishValue];
+                        return `
+                            <label style="width: auto;">
+                                <input type="checkbox" id="edit-emotion-${id}-${englishValue}" name="editEmotion" value="${englishValue}" ${checked}> ${chineseText}
+                            </label>
+                        `;
+                    }).join('') + `</div>`;
+            };
+
+            // 建立編輯表單的 HTML 內容
+            entryElement.innerHTML = `
+                <div class="edit-mode">
+                    <div class="action-buttons">
+                        <button onclick="saveEdit(${id})" class="save-button">[SAVE]</button>
+                        <button onclick="loadLogs()" class="cancel-button">[CANCEL]</button>
+                    </div>
+                    <div class="log-field">日期: ${log.date}</div>
+                    
+                    <div class="log-field">
+                        <label>入睡時間:</label>
+                        <select id="edit-sleepTime-${id}">${generateTimeOptions(log.sleepTime)}</select>
+                    </div>
+                    <div class="log-field">
+                        <label>起床時間:</label>
+                        <select id="edit-wakeTime-${id}">${generateTimeOptions(log.wakeTime)}</select>
+                    </div>
+                    <div class="log-field">
+                        <label>潛伏期:</label>
+                        <select id="edit-latency-${id}">${generateLatencyOptions(log.latency)}</select>
+                    </div>
+                    <div class="log-field">
+                        <label>精神狀態:</label>
+                        <select id="edit-vigorScore-${id}">${generateVigorOptions(log.vigorScore)}</select>
+                    </div>
+                    
+                    <div class="log-field">
+                        <label>品質評分:</label>
+                        <input type="range" id="edit-qualityScore-${id}" min="1" max="10" value="${log.qualityScore}" oninput="this.nextElementSibling.value = this.value" style="width: calc(100% - 130px); vertical-align: middle;">
+                        <output style="font-weight: bold; color: #00ffff; vertical-align: middle; width: 30px;">${log.qualityScore}</output>
+                    </div>
+
+                    <div class="log-field"> 
+                        <label>夢境簡述:</label>
+                        <textarea id="edit-dreamContent-${id}" style="margin-top:0;">${log.dreamContent}</textarea>
+                    </div>
+                    
+                    <div class="log-field">
+                        <label>情緒標籤:</label>
+                        ${generateEmotionCheckboxes(id, log.emotions || [])}
+                    </div>
+                </div>
+            `;
+            entryElement.classList.add('editing');
+        };
+
+        // 儲存編輯後的資料
+        window.saveEdit = function(id) {
+            let logs = JSON.parse(localStorage.getItem(STORAGE_KEY));
+            const logIndex = logs.findIndex(l => l.id === id);
+            
+            if (logIndex === -1) {
+                showMessage('錯誤：找不到要更新的紀錄');
+                return;
+            }
+            
+            // 由於 generateEmotionCheckboxes 使用了英文 value，這裡仍需讀取英文 value
+            const updatedEmotions = Array.from(document.querySelectorAll(`#log-${id} input[name="editEmotion"]:checked`))
+                .map(cb => cb.value);
+            
+            logs[logIndex] = {
+                ...logs[logIndex],
+                sleepTime: document.getElementById(`edit-sleepTime-${id}`).value,
+                wakeTime: document.getElementById(`edit-wakeTime-${id}`).value,
+                latency: document.getElementById(`edit-latency-${id}`).value,
+                vigorScore: document.getElementById(`edit-vigorScore-${id}`).value,
+                qualityScore: parseInt(document.getElementById(`edit-qualityScore-${id}`).value),
+                dreamContent: document.getElementById(`edit-dreamContent-${id}`).value,
+                emotions: updatedEmotions 
+            };
+
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(logs));
+            loadLogs(); 
+            calculateAverages(); 
+            showMessage('數據已更新！');
+        }
+        
+        function loadLogs() {
+            let logs = localStorage.getItem(STORAGE_KEY);
+            logs = logs ? JSON.parse(logs) : [];
+
+            if (logs.length === 0) {
+                logList.innerHTML = '<p style="padding-left:15px">等待數據輸入...</p>';
+                return;
+            }
+
+            const emotionMap = {
+                'Joy': '歡樂/興奮',
+                'Anxiety': '焦慮/恐懼',
+                'Calm': '平靜/療癒',
+                'Absurd': '困惑/荒謬'
+            };
+
+            logList.innerHTML = logs.map(log => {
+                const getLatencyText = (val) => {
+                    if (val === '<15') return '潛伏期: 極佳 (<15m)';
+                    if (val === '15-30') return '潛伏期: 正常 (15-30m)';
+                    if (val === '>30') return '潛伏期: 緩慢 (>30m)';
+                    return val;
+                };
+
+                const getVigorText = (val) => {
+                    if (val == 1) return '精神: 疲憊/昏沉';
+                    if (val == 2) return '精神: 略疲憊/普通';
+                    if (val == 3) return '精神: 充沛/清醒';
+                    return val;
+                };
+                
+                const durationResult = calculateDuration(log.sleepTime, log.wakeTime);
+                const sleepDuration = durationResult.durationString;
+
+                const chineseEmotions = log.emotions && log.emotions.length > 0 ? 
+                    log.emotions.map(e => emotionMap[e] || e).join(', ') : '';
+
+                const emotionTags = chineseEmotions ? `[EMOTIONS: ${chineseEmotions}]` : '';
+
+                const dreamDetail = log.dreamContent && log.dreamContent !== '未記錄夢境細節' ? 
+                    `\n> 夢境簡述: ${log.dreamContent}` : '';
+                
+                return `
+                    <div class="log-entry" id="log-${log.id}">
+                        <div class="action-buttons">
+                            <button onclick="editLog(${log.id})">[EDIT]</button>
+                            <button onclick="deleteLog(${log.id})">[DEL]</button>
+                        </div>
+                        > 日期: ${log.date} | **時長: ${sleepDuration}** | 品質: ${log.qualityScore}/10
+                        \n> 核心: ${getLatencyText(log.latency)} | ${getVigorText(log.vigorScore)}
+                        \n> ${emotionTags}
+                        ${dreamDetail}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function showMessage(msg) {
+             message.textContent = msg;
+            message.style.display = 'block';
+            message.style.backgroundColor = 'rgba(0, 255, 255, 0.2)';
+            message.style.border = '1px solid #00ffff';
+            message.style.color = '#00ffff';
+            message.style.padding = '10px';
+            message.style.marginTop = '15px';
+            message.style.textAlign = 'center';
+            message.style.boxShadow = '0 0 10px rgba(0, 255, 255, 0.7)';
+            setTimeout(() => {
+                message.style.display = 'none';
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
